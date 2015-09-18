@@ -52,7 +52,7 @@ module Split
       # Only run the process once
       return alternative if @alternative_choosen
 
-      if @options[:override]
+      if @options[:override] && !should_store_override? # Dont set here if we should_store_override
         self.alternative = @options[:override]
       elsif @options[:disabled] || !Split.configuration.enabled
         self.alternative = @experiment.control
@@ -66,7 +66,12 @@ module Split
         elsif @user[@experiment.key]
           self.alternative = @user[@experiment.key]
         else
-          self.alternative = @experiment.next_alternative
+          # Use an override alternative if we should_store_override
+          self.alternative = if should_store_override?
+            @options[:override]
+          else
+            @experiment.next_alternative
+          end
 
           # Increment the number of participants since we are actually choosing a new alternative
           self.alternative.increment_participation
@@ -83,13 +88,13 @@ module Split
     end
 
     private
+    
+    def should_store_override?
+      should_store_alternative? && @options[:override] && Split.configuration.store_override
+    end
 
     def should_store_alternative?
-      if @options[:override] || @options[:disabled]
-        Split.configuration.store_override
-      else
-        !exclude_user?
-      end
+      !(@options[:disabled] && exclude_user?)
     end
 
     def cleanup_old_versions
